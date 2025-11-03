@@ -33,7 +33,10 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
   void initState() {
     super.initState();
     repo = WeatherRepositoryImpl(
-      WeatherRemoteDataSourceImpl(http.Client(), 'b0ee8bb4ad5a2fc82fcf925a0ac3d3fb'),
+      WeatherRemoteDataSourceImpl(
+        http.Client(),
+        'b0ee8bb4ad5a2fc82fcf925a0ac3d3fb',
+      ),
     );
     _loadWeatherByMyLocation();
   }
@@ -46,13 +49,16 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) throw Exception('Chưa bật dịch vụ vị trí trên thiết bị!');
+      if (!serviceEnabled)
+        throw Exception('Chưa bật dịch vụ vị trí trên thiết bị!');
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) throw Exception('Thiết bị chưa cấp quyền vị trí');
+        if (permission == LocationPermission.denied)
+          throw Exception('Thiết bị chưa cấp quyền vị trí');
       }
-      if (permission == LocationPermission.deniedForever) throw Exception('Thiết bị bị cấm quyền vị trí');
+      if (permission == LocationPermission.deniedForever)
+        throw Exception('Thiết bị bị cấm quyền vị trí');
 
       final pos = await Geolocator.getCurrentPosition();
       myLat = pos.latitude;
@@ -62,9 +68,12 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
 
       // Lấy tên thực tế địa chỉ để hiển thị trên search box
       final geocodeUrl = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?lat=$myLat&lon=$myLon&format=json'
+        'https://nominatim.openstreetmap.org/reverse?lat=$myLat&lon=$myLon&format=json',
       );
-      final geocodeResponse = await http.get(geocodeUrl, headers: {'User-Agent': 'weather-my-location'});
+      final geocodeResponse = await http.get(
+        geocodeUrl,
+        headers: {'User-Agent': 'weather-my-location'},
+      );
       if (geocodeResponse.statusCode == 200) {
         final data = jsonDecode(geocodeResponse.body);
         selectedCity = data['display_name'] ?? 'Vị trí của tôi';
@@ -104,7 +113,9 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
       errorMessage = 'Không thể tải dữ liệu thời tiết';
       weather = null;
     }
-    setState(() { isLoading = false; });
+    setState(() {
+      isLoading = false;
+    });
   }
 
   List<Color> _getGradientColors() {
@@ -116,7 +127,11 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
     final hour = DateTime.now().hour;
 
     if (hour >= 19 || hour < 6) {
-      return [const Color(0xFF0F2027), const Color(0xFF203A43), const Color(0xFF2C5364)];
+      return [
+        const Color(0xFF0F2027),
+        const Color(0xFF203A43),
+        const Color(0xFF2C5364),
+      ];
     }
     if (condition.contains('clear') || condition.contains('sun')) {
       return [const Color(0xFF56CCF2), const Color(0xFF2F80ED)];
@@ -161,13 +176,19 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
     if (d.contains('rain')) return 'assets/lottie/rainy.json';
     if (d.contains('cloud')) return 'assets/lottie/Clouds.json';
     if (d.contains('snow')) return 'assets/lottie/snow.json';
-    if (d.contains('sun') || d.contains('clear')) return 'assets/lottie/Sunny.json';
+    if (d.contains('sun') || d.contains('clear'))
+      return 'assets/lottie/Sunny.json';
     return 'assets/lottie/Sunny.json';
   }
 
   Future<List<String>> searchCityOpenStreetMap(String pattern) async {
-    final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$pattern&format=json&addressdetails=1&limit=5');
-    final response = await http.get(url, headers: {'User-Agent': 'weather-app-example'});
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/search?q=$pattern&format=json&addressdetails=1&limit=5',
+    );
+    final response = await http.get(
+      url,
+      headers: {'User-Agent': 'weather-app-example'},
+    );
     if (response.statusCode == 200) {
       final List items = List.from(jsonDecode(response.body) ?? []);
       return items.map((item) => item['display_name'].toString()).toList();
@@ -198,9 +219,16 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                   borderSide: BorderSide.none,
                 ),
                 prefixIcon: Icon(Icons.search, color: Colors.white),
-                contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 6,
+                  horizontal: 12,
+                ),
               ),
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 18),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 18,
+              ),
             ),
             suggestionsCallback: (pattern) async {
               if (pattern.isEmpty) return [];
@@ -209,7 +237,10 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
             itemBuilder: (context, suggestion) {
               return ListTile(
                 leading: Icon(Icons.location_city, color: Colors.blue),
-                title: Text(suggestion, style: TextStyle(fontWeight: FontWeight.w500)),
+                title: Text(
+                  suggestion,
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
               );
             },
             onSuggestionSelected: (suggestion) {
@@ -224,19 +255,25 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(isDarkMode ? Icons.nightlight : Icons.wb_sunny, color: Colors.white),
+            icon: Icon(
+              isDarkMode ? Icons.nightlight : Icons.wb_sunny,
+              color: Colors.white,
+            ),
             tooltip: isDarkMode ? 'Light Mode' : 'Dark Mode',
             onPressed: () => setState(() => isDarkMode = !isDarkMode),
           ),
           IconButton(
-            icon: Icon(isCelsius ? Icons.thermostat : Icons.thermostat_auto, color: Colors.white),
+            icon: Icon(
+              isCelsius ? Icons.thermostat : Icons.thermostat_auto,
+              color: Colors.white,
+            ),
             tooltip: isCelsius ? 'Chuyển sang °F' : 'Chuyển sang °C',
             onPressed: () => setState(() => isCelsius = !isCelsius),
           ),
           IconButton(
-            icon: const Icon(Icons.more_horiz, color: Colors.white),
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Làm mới vị trí',
             onPressed: () async {
-              // refresh lại đúng GPS khi nhấn vào menu.
               await _loadWeatherByMyLocation();
             },
           ),
@@ -246,13 +283,13 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
         children: [
           Positioned.fill(
             child: weather != null
-              ? Lottie.asset(
-                  _getLottieAssetByDesc(weather!.description),
-                  fit: BoxFit.cover,
-                  repeat: true,
-                  animate: true,
-                )
-              : const SizedBox.shrink()
+                ? Lottie.asset(
+                    _getLottieAssetByDesc(weather!.description),
+                    fit: BoxFit.cover,
+                    repeat: true,
+                    animate: true,
+                  )
+                : const SizedBox.shrink(),
           ),
           Container(
             decoration: BoxDecoration(
@@ -263,11 +300,13 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
               ),
             ),
             child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
                 : errorMessage != null
-                    ? _buildErrorView()
-                    : _buildWeatherContent(),
-          )
+                ? _buildErrorView()
+                : _buildWeatherContent(),
+          ),
         ],
       ),
     );
@@ -290,9 +329,14 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
             style: TextButton.styleFrom(
               backgroundColor: Colors.white.withOpacity(0.2),
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
-            child: const Text('Thử lại', style: TextStyle(color: Colors.white, fontSize: 16)),
+            child: const Text(
+              'Thử lại',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -399,8 +443,14 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       Text(
-                        i == 0 ? 'Bây giờ' : '${hour.toString().padLeft(2, '0')}:00',
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                        i == 0
+                            ? 'Bây giờ'
+                            : '${hour.toString().padLeft(2, '0')}:00',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       Icon(
                         _getWeatherIcon(weather!.description),
@@ -409,7 +459,11 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                       ),
                       Text(
                         '${_convertTemp(weather!.temperature - (i * 0.5))}°${isCelsius ? "C" : "F"}',
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -460,10 +514,18 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                     width: 60,
                     child: Text(
                       dayName,
-                      style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                  Icon(_getWeatherIcon(weather!.description), color: Colors.white, size: 24),
+                  Icon(
+                    _getWeatherIcon(weather!.description),
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Row(
@@ -489,12 +551,20 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                   const SizedBox(width: 12),
                   Text(
                     '${_convertTemp(weather!.minTemperature - i)}°${isCelsius ? "C" : "F"}',
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 17, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Text(
                     '${_convertTemp(weather!.maxTemperature - i)}°${isCelsius ? "C" : "F"}',
-                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -510,17 +580,41 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
       children: [
         Row(
           children: [
-            Expanded(child: _buildDetailCard('ĐỘ ẨM', '${weather!.humidity}%', Icons.water_drop)),
+            Expanded(
+              child: _buildDetailCard(
+                'ĐỘ ẨM',
+                '${weather!.humidity}%',
+                Icons.water_drop,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildDetailCard('CẢM GIÁC', '${_convertTemp(weather!.feelsLike)}°${isCelsius ? "C" : "F"}', Icons.thermostat)),
+            Expanded(
+              child: _buildDetailCard(
+                'CẢM GIÁC',
+                '${_convertTemp(weather!.feelsLike)}°${isCelsius ? "C" : "F"}',
+                Icons.thermostat,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildDetailCard('ÁP SUẤT', '${weather!.pressure} hPa', Icons.compress)),
+            Expanded(
+              child: _buildDetailCard(
+                'ÁP SUẤT',
+                '${weather!.pressure} hPa',
+                Icons.compress,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildDetailCard('TÌNH TRẠNG', weather!.description.toUpperCase(), Icons.cloud)),
+            Expanded(
+              child: _buildDetailCard(
+                'TÌNH TRẠNG',
+                weather!.description.toUpperCase(),
+                Icons.cloud,
+              ),
+            ),
           ],
         ),
       ],

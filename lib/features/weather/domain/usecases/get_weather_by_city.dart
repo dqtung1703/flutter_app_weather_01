@@ -2,7 +2,7 @@ import '../entities/weather.dart';
 import '../repositories/weather_repository.dart';
 
 class GetWeatherByCity {
-  final WeatherRepository repository;
+  final WeatherNowWidget repository;
 
   GetWeatherByCity(this.repository);
 

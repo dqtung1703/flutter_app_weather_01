@@ -2,7 +2,7 @@ import '../entities/weather_forecast.dart';
 import '../repositories/weather_forecast_repository.dart';
 
 class GetWeatherForecast {
-  final WeatherForecastRepository repository;
+  final WeatherForecastWidget repository;
 
   GetWeatherForecast(this.repository);
 
