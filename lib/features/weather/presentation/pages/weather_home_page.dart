@@ -65,7 +65,6 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
   CitySuggestion? selectedCity;
   final TextEditingController searchController = TextEditingController();
   late final GetCitySuggestions _getCitySuggestions;
-  int _currentTab = 0;
 
   @override
   void initState() {

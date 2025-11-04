@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/app_locator.dart';
 import '../../domain/entities/forecast.dart';
 import '../../domain/usecases/get_hourly_forecast.dart';
-import '../widgets/weather_chart.dart';
 import '../../domain/repositories/weather_repository.dart';
 
 class WeatherDetailPage extends StatefulWidget {
