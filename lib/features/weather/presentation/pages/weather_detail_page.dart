@@ -26,8 +26,8 @@ class WeatherDetailPage extends StatefulWidget {
 class _WeatherDetailPageState extends State<WeatherDetailPage> {
   List<Forecast> hourlyForecast = [];
   bool loading = true;
-  bool darkMode = false; 
-  bool showFahrenheit = false; 
+  bool darkMode = false;
+  bool showFahrenheit = false;
 
   @override
   void initState() {
@@ -44,16 +44,16 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
     setState(() => loading = false);
   }
 
-  String temp(double c) => showFahrenheit
-      ? "${(c * 9/5 + 32).round()}°F"
-      : "${c.round()}°C";
+  String temp(double c) =>
+      showFahrenheit ? "${(c * 9 / 5 + 32).round()}°F" : "${c.round()}°C";
 
   IconData getWeatherIcon(String? description) {
     final keyword = (description ?? '').toLowerCase();
     if (keyword.contains("rain")) return Icons.grain;
     if (keyword.contains("clear")) return Icons.wb_sunny;
     if (keyword.contains("cloud")) return Icons.cloud;
-    if (keyword.contains("storm") || keyword.contains("thunder")) return Icons.flash_on;
+    if (keyword.contains("storm") || keyword.contains("thunder"))
+      return Icons.flash_on;
     return Icons.cloud;
   }
 
@@ -68,7 +68,9 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
     );
 
     return Scaffold(
-      backgroundColor: darkMode ? const Color(0xFF111827) : const Color(0xFF6EC6F4),
+      backgroundColor: darkMode
+          ? const Color(0xFF111827)
+          : const Color(0xFF6EC6F4),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -87,9 +89,9 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
           tooltip: "Quản lý thành phố yêu thích",
           color: darkMode ? Colors.white : Colors.black,
           onPressed: () {
-              // Sử dụng GoRouter để điều hướng đến trang favorites
-              context.go('/favorites'); // hoặc context.go(AppRoutes.favorites)
-            }, // context.go('/favorites') nếu dùng go_router
+            // Sử dụng GoRouter để điều hướng đến trang favorites
+            context.go('/favorites'); // hoặc context.go(AppRoutes.favorites)
+          }, // context.go('/favorites') nếu dùng go_router
         ),
         actions: [
           IconButton(
@@ -107,27 +109,16 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
           IconButton(
             icon: Icon(
               showFahrenheit ? Icons.thermostat_auto : Icons.thermostat,
-              color: showFahrenheit ? Colors.red : (darkMode ? Colors.white : Colors.black),
+              color: showFahrenheit
+                  ? Colors.red
+                  : (darkMode ? Colors.white : Colors.black),
             ),
             tooltip: "Đổi đơn vị °C/°F",
             onPressed: () => setState(() => showFahrenheit = !showFahrenheit),
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        elevation: 10,
-        selectedItemColor: const Color(0xFF329DF7),
-        unselectedItemColor: Colors.grey,
-        currentIndex: 1,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.cloud), label: "Thời tiết"),
-          BottomNavigationBarItem(icon: Icon(Icons.star), label: "Yêu thích"),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: "Bản đồ"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Tài khoản"),
-        ],
-        onTap: (idx) {},
-      ),
+
       body: loading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
           : Container(
@@ -135,21 +126,28 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(14, 70, 14, 22),
                 children: [
-                  const Icon(Icons.calendar_month, color: Colors.white, size: 36),
+                  const Icon(
+                    Icons.calendar_month,
+                    color: Colors.white,
+                    size: 36,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     widget.city,
                     style: TextStyle(
-                        fontSize: 30,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold),
+                      fontSize: 30,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     "Dự báo 6 ngày",
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.9), fontSize: 17),
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 17,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   // CARD DỰ BÁO THEO GIỜ
@@ -174,8 +172,11 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
                           height: 130,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
-                            itemCount: hourlyForecast.length > 7 ? 7 : hourlyForecast.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 10),
+                            itemCount: hourlyForecast.length > 7
+                                ? 7
+                                : hourlyForecast.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 10),
                             itemBuilder: (context, i) {
                               final f = hourlyForecast[i];
                               final isNow = i == 0;
@@ -183,28 +184,43 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 5,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isNow ? Colors.white.withOpacity(0.7) : Colors.transparent,
+                                      color: isNow
+                                          ? Colors.white.withOpacity(0.7)
+                                          : Colors.transparent,
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
-                                      isNow ? "Bây giờ" : "${f.dateTime.hour.toString().padLeft(2, '0')}:00",
+                                      isNow
+                                          ? "Bây giờ"
+                                          : "${f.dateTime.hour.toString().padLeft(2, '0')}:00",
                                       style: TextStyle(
-                                        color: isNow ? Color(0xFF1B61F5) : Colors.white,
+                                        color: isNow
+                                            ? Color(0xFF1B61F5)
+                                            : Colors.white,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Icon(getWeatherIcon(f.description), color: Colors.white, size: 28),
+                                  Icon(
+                                    getWeatherIcon(f.description),
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
                                   const SizedBox(height: 6),
                                   Text(
                                     temp(f.temperature),
                                     style: TextStyle(
                                       fontSize: 16,
-                                      color: isNow ? Color(0xFF1B61F5) : Colors.white,
+                                      color: isNow
+                                          ? Color(0xFF1B61F5)
+                                          : Colors.white,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -230,7 +246,10 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
                         ),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
                         child: Row(
                           children: [
                             Expanded(
@@ -238,19 +257,23 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    idx == 0 ? "Hôm nay" : "Thứ ${now.weekday + 1}",
+                                    idx == 0
+                                        ? "Hôm nay"
+                                        : "Thứ ${now.weekday + 1}",
                                     style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 17),
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 17,
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     "${now.day}/${now.month}/${now.year}",
                                     style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontWeight: FontWeight.w400,
-                                        fontSize: 14),
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -259,7 +282,11 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Icon(Icons.cloud, color: Colors.white, size: 33),
+                                Icon(
+                                  Icons.cloud,
+                                  color: Colors.white,
+                                  size: 33,
+                                ),
                                 Text(
                                   temp(20 + idx.toDouble()),
                                   style: const TextStyle(
@@ -271,8 +298,9 @@ class _WeatherDetailPageState extends State<WeatherDetailPage> {
                                 Text(
                                   temp(17 + idx.toDouble()),
                                   style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 15),
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 15,
+                                  ),
                                 ),
                               ],
                             ),
