@@ -3,7 +3,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../../core/di/app_locator.dart'; // Tùy cấu trúc project
 import '../../domain/entities/weather.dart';
 import '../../domain/entities/forecast.dart';
@@ -18,32 +18,68 @@ import '../../presentation/pages/weather_map_page.dart';
 import '../widgets/current_weather_widget.dart';
 import '../widgets/hourly_forecast_widget.dart';
 import '../widgets/daily_forecast_widget.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // Hàm lấy vị trí qua GPS (dùng cho refresh location)
-Future<String?> getCurrentCity() async {
+Future<String?> _getCurrentCity() async {
   try {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return null;
+    bool enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled) throw "GPS/location services đang bị tắt";
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return null;
+      if (permission == LocationPermission.denied) throw "Từ chối quyền vị trí";
     }
-    if (permission == LocationPermission.deniedForever) return null;
-    Position pos = await Geolocator.getCurrentPosition(
+    if (permission == LocationPermission.deniedForever) {
+      throw "Đã từ chối quyền vị trí vĩnh viễn.";
+    }
+    final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
-    ).timeout(const Duration(seconds: 10));
-    List<Placemark> placemarks = await placemarkFromCoordinates(
-      pos.latitude,
-      pos.longitude,
     );
-    if (placemarks.isNotEmpty) {
-      return placemarks.first.locality ??
-          placemarks.first.subAdministrativeArea ??
-          "Unknown";
+    print('Your position: $pos');
+
+    if (kIsWeb) {
+      // Dùng Nominatim reverse geocoding trên web
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}',
+      );
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final jsonRes = jsonDecode(response.body);
+        final address = jsonRes['address'];
+        if (address != null && address['city'] != null) return address['city'];
+        return address['state'] ?? address['county'] ?? null;
+      }
+      return "Unknown";
     }
-  } catch (_) {}
-  return null;
+
+    // Mobile: dùng placemarkFromCoordinates
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
+      print("Placemarks: $placemarks");
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        final city = (place.locality?.isNotEmpty ?? false)
+            ? place.locality
+            : (place.subAdministrativeArea?.isNotEmpty ?? false)
+            ? place.subAdministrativeArea
+            : null;
+        if (city != null && city.isNotEmpty) {
+          return city;
+        }
+      }
+    } catch (e) {
+      print("Placemark geocoding error: $e");
+    }
+    return "Unknown";
+  } catch (e) {
+    print("Error _getCurrentCity: $e");
+    rethrow;
+  }
 }
 
 class WeatherHomePage extends StatefulWidget {
@@ -129,7 +165,7 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
     setState(() => loading = true);
     String? gpsCity;
     try {
-      gpsCity = await getCurrentCity().timeout(Duration(seconds: 10));
+      gpsCity = await _getCurrentCity().timeout(Duration(seconds: 10));
     } catch (_) {}
     if (gpsCity == null || gpsCity.isEmpty) {
       gpsCity = widget.city;

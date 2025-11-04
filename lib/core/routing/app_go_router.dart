@@ -2,18 +2,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/weather/presentation/pages/weather_home_page.dart';
 import '../../features/weather/presentation/pages/weather_detail_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/favorites/presentation/pages/favorite_cities_page.dart';
 import 'app_routes.dart';
 import 'go_router_refresh_change.dart';
+import '../../features/weather/presentation/pages/home_location_redirector.dart';
+import '../../features/weather/presentation/pages/weather_home_page.dart';
 
 // Hàm sử dụng đặt object city
 
 class AppGoRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.login, // vẫn login (sẽ go về home sau khi có city)
+    initialLocation: AppRoutes.login,
     debugLogDiagnostics: true,
     routes: [
       GoRoute(
@@ -29,7 +30,12 @@ class AppGoRouter {
           GoRoute(
             path: AppRoutes.home,
             builder: (context, state) {
-              final city = state.extra as String? ?? 'Hanoi';
+              // Nếu chưa có city (lúc đầu), show HomeLocationRedirector
+              final city = state.extra as String?;
+              if (city == null) {
+                return const HomeLocationRedirector();
+              }
+              // Nếu đã có city (sau redirect), show WeatherHomePage
               return WeatherHomePage(city: city);
             },
           ),
@@ -37,20 +43,18 @@ class AppGoRouter {
             path: AppRoutes.favorites,
             builder: (context, state) => const FavoriteCitiesPage(),
           ),
-          // ROUTE WEATHER DETAIL - nhận city, lat, lon, day qua extra
           GoRoute(
-  path: '/weather_detail',
-  builder: (context, state) {
-    final arg = state.extra as WeatherDetailPageParams;
-    return WeatherDetailPage(
-      city: arg.city,
-      lat: arg.lat,
-      lon: arg.lon,
-      day: arg.day,
-    );
-  },
-),
-
+            path: '/weather_detail',
+            builder: (context, state) {
+              final arg = state.extra as WeatherDetailPageParams;
+              return WeatherDetailPage(
+                city: arg.city,
+                lat: arg.lat,
+                lon: arg.lon,
+                day: arg.day,
+              );
+            },
+          ),
           GoRoute(
             path: AppRoutes.profile,
             builder: (context, state) => const ProfilePage(),
