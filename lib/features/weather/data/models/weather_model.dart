@@ -16,6 +16,6 @@ class WeatherModel extends Weather {
             : '',
         brief: json['brief'],
         aqi: json['aqi'],
-        uvIndex: json['uv_index'],
+        uvIndex: json['uv_index'], 
       );
 }
