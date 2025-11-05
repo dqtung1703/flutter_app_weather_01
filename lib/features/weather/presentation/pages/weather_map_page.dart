@@ -4,18 +4,35 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../../presentation/pages/weather_detail_page.dart';
 
-class RainMapPage extends StatefulWidget {
-  const RainMapPage({Key? key}) : super(key: key);
+class FavoriteCityMarker {
+  final String name;
+  final double lat;
+  final double lon;
 
-  @override
-  State<RainMapPage> createState() => _RainMapPageState();
+  FavoriteCityMarker({required this.name, required this.lat, required this.lon});
+
+  factory FavoriteCityMarker.fromJson(Map<String, dynamic> json) {
+    return FavoriteCityMarker(
+      name: json['name'] ?? '',
+      lat: double.tryParse(json['lat'].toString()) ?? 0.0,
+      lon: double.tryParse(json['lon'].toString()) ?? 0.0,
+    );
+  }
 }
 
-class _RainMapPageState extends State<RainMapPage> {
+class WeatherMapPage extends StatefulWidget {
+  const WeatherMapPage({Key? key}) : super(key: key);
+
+  @override
+  State<WeatherMapPage> createState() => _WeatherMapPageState();
+}
+
+class _WeatherMapPageState extends State<WeatherMapPage> {
   final mapController = MapController();
   LatLng? currentLocation;
-  List<LatLng> favoriteMarkers = [];
+  List<FavoriteCityMarker> favoriteMarkers = [];
 
   @override
   void initState() {
@@ -40,17 +57,13 @@ class _RainMapPageState extends State<RainMapPage> {
     });
   }
 
-  // Đọc dữ liệu địa điểm yêu thích từ SharedPreferences
   Future<void> _loadFavoriteMarkers() async {
     final prefs = await SharedPreferences.getInstance();
     final List<String> locationJsonList = prefs.getStringList('favoriteLocationsWithLatLng') ?? [];
     setState(() {
       favoriteMarkers = locationJsonList.map((jsonStr) {
         final data = jsonDecode(jsonStr);
-        return LatLng(
-          double.tryParse(data['lat'].toString()) ?? 0.0,
-          double.tryParse(data['lon'].toString()) ?? 0.0,
-        );
+        return FavoriteCityMarker.fromJson(data);
       }).toList();
     });
   }
@@ -58,11 +71,11 @@ class _RainMapPageState extends State<RainMapPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Bản đồ lượng mưa')),
+      appBar: AppBar(title: Text('Bản đồ thời tiết')),
       body: FlutterMap(
         mapController: mapController,
         options: MapOptions(
-          initialCenter: LatLng(21.0285, 105.8542),
+          initialCenter: currentLocation ?? LatLng(21.0285, 105.8542),
           initialZoom: 6,
           interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
         ),
@@ -84,25 +97,52 @@ class _RainMapPageState extends State<RainMapPage> {
                   height: 42,
                   child: Icon(Icons.my_location, color: Colors.blue, size: 36),
                 ),
-              ...favoriteMarkers.map((loc) => Marker(
-                point: loc,
-                width: 42,
-                height: 42,
-                child: Icon(Icons.star, color: Colors.amber, size: 32),
+              ...favoriteMarkers.map((city) => Marker(
+                point: LatLng(city.lat, city.lon),
+                width: 70,
+                height: 54,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => WeatherDetailPage(
+                          city: city.name,
+                          lat: city.lat,
+                          lon: city.lon,
+                          day: DateTime.now(),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      Icon(Icons.location_city, color: Colors.amber, size: 32),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        color: Colors.white.withOpacity(0.8),
+                        child: Text(
+                          city.name,
+                          style: const TextStyle(fontSize: 12, color: Colors.black, overflow: TextOverflow.ellipsis),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               )),
             ],
           ),
         ],
       ),
       floatingActionButton: currentLocation == null
-        ? null
-        : FloatingActionButton(
-            tooltip: 'Về vị trí của tôi',
-            child: Icon(Icons.my_location),
-            onPressed: () {
-              mapController.move(currentLocation!, 13);
-            },
-          ),
+          ? null
+          : FloatingActionButton(
+              tooltip: 'Về vị trí của tôi',
+              child: Icon(Icons.my_location),
+              onPressed: () {
+                mapController.move(currentLocation!, 13);
+              },
+            ),
     );
   }
 }

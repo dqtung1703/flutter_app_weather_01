@@ -1,23 +1,35 @@
-import '../datasources/weather_remote_datasource.dart';
-import '../models/weather_model.dart';
-
-abstract class WeatherRepository {
-  Future<WeatherModel> getWeatherByCity(String cityName);
-  Future<WeatherModel> getWeatherByLatLon(double lat, double lon); // THÊM
-}
+import '../../domain/entities/weather.dart';
+import '../../domain/entities/forecast.dart';
+import '../../domain/repositories/weather_repository.dart';
+import '../datasources/weather_api_datasource.dart';
 
 class WeatherRepositoryImpl implements WeatherRepository {
-  final WeatherRemoteDataSource remoteDataSource;
-
-  WeatherRepositoryImpl(this.remoteDataSource);
-
-  @override
-  Future<WeatherModel> getWeatherByCity(String cityName) async {
-    return await remoteDataSource.fetchWeatherByCity(cityName);
-  }
+  final WeatherApiDatasource datasource;
+  WeatherRepositoryImpl(this.datasource);
 
   @override
-  Future<WeatherModel> getWeatherByLatLon(double lat, double lon) async {
-    return await remoteDataSource.fetchWeatherByLatLon(lat, lon);  // THÊM
-  }
+  Future<Weather> getWeatherByCity(String city) =>
+      datasource.fetchWeather(city);
+
+  @override
+  Future<Weather> getWeatherByLatLon(double lat, double lon) =>
+      datasource.fetchWeatherByLatLon(lat, lon);
+
+  @override
+  Future<List<Forecast>> getDailyForecast(String city) =>
+      datasource.fetchDailyForecast(city);
+
+  @override
+  Future<List<Forecast>> getHourlyForecast(String city, DateTime day) =>
+      datasource.fetchHourlyForecast(city, day);
+
+  @override
+  Future<List<Forecast>> getDailyForecastByLatLon(double lat, double lon) =>
+      datasource.fetchDailyForecastByLatLon(lat, lon);
+  @override
+  Future<List<Forecast>> getHourlyForecastByLatLon(
+    double lat,
+    double lon,
+    DateTime date,
+  ) => datasource.fetchHourlyForecastByLatLon(lat, lon, date);
 }

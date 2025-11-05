@@ -1,29 +1,31 @@
-class Weather {
-  final String city;
+class Forecast {
+  final DateTime dateTime;
   final double temperature;
   final double minTemp;
   final double maxTemp;
-  final String description;
-  final String? brief;
-  final double feelsLike;
   final int humidity;
   final double windSpeed;
   final int pressure;
+  final int rainChance;
+  final double? rainVolume; // <-- Thêm dòng này!
+  final String? description;
   final int? aqi;
   final int? uvIndex;
+  final String? dayName;
 
-  Weather({
-    required this.city,
+  Forecast({
+    required this.dateTime,
     required this.temperature,
     required this.minTemp,
     required this.maxTemp,
-    required this.description,
-    this.brief,
-    required this.feelsLike,
     required this.humidity,
     required this.windSpeed,
     required this.pressure,
+    required this.rainChance,
+    this.rainVolume, // <-- và thêm ở đây!
+    this.description,
     this.aqi,
     this.uvIndex,
+    this.dayName,
   });
 }

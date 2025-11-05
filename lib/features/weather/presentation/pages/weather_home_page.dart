@@ -1,566 +1,512 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../../../core/di/app_locator.dart'; // Tùy cấu trúc project
+import '../../domain/entities/weather.dart';
+import '../../domain/entities/forecast.dart';
+import '../../domain/entities/city_suggestion.dart';
+import '../../domain/usecases/get_weather.dart';
+import '../../domain/usecases/get_daily_forecast.dart';
+import '../../domain/usecases/get_hourly_forecast.dart';
+import '../../domain/repositories/weather_repository.dart';
+import '../../domain/usecases/get_city_suggestions.dart';
+import '../../presentation/pages/weather_map_page.dart';
+import '../pages/daily_detail_page.dart';
+import '../widgets/current_weather_widget.dart';
+import '../widgets/hourly_forecast_widget.dart';
+import '../widgets/daily_forecast_widget.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_typeahead/flutter_typeahead.dart';
-import 'package:lottie/lottie.dart';
-import 'package:geolocator/geolocator.dart';
-import '../../data/models/weather_model.dart';
-import '../../data/datasources/weather_remote_datasource.dart';
-import '../../data/repositories/weather_repository_impl.dart';
+
+// Hàm lấy vị trí qua GPS (dùng cho refresh location)
+Future<String?> _getCurrentCity() async {
+  try {
+    bool enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled) throw "GPS/location services đang bị tắt";
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) throw "Từ chối quyền vị trí";
+    }
+    if (permission == LocationPermission.deniedForever) {
+      throw "Đã từ chối quyền vị trí vĩnh viễn.";
+    }
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    print('Your position: $pos');
+
+    if (kIsWeb) {
+      // Dùng Nominatim reverse geocoding trên web
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}',
+      );
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final jsonRes = jsonDecode(response.body);
+        final address = jsonRes['address'];
+        if (address != null && address['city'] != null) return address['city'];
+        return address['state'] ?? address['county'] ?? null;
+      }
+      return "Unknown";
+    }
+
+    // Mobile: dùng placemarkFromCoordinates
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
+      print("Placemarks: $placemarks");
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        final city = (place.locality?.isNotEmpty ?? false)
+            ? place.locality
+            : (place.subAdministrativeArea?.isNotEmpty ?? false)
+            ? place.subAdministrativeArea
+            : null;
+        if (city != null && city.isNotEmpty) {
+          return city;
+        }
+      }
+    } catch (e) {
+      print("Placemark geocoding error: $e");
+    }
+    return "Unknown";
+  } catch (e) {
+    print("Error _getCurrentCity: $e");
+    rethrow;
+  }
+}
 
 class WeatherHomePage extends StatefulWidget {
-  final String? city;
-  const WeatherHomePage({Key? key, this.city}) : super(key: key);
+  final String city;
+  const WeatherHomePage({Key? key, required this.city}) : super(key: key);
 
   @override
   State<WeatherHomePage> createState() => _WeatherHomePageState();
 }
 
 class _WeatherHomePageState extends State<WeatherHomePage> {
-  final TextEditingController _searchController = TextEditingController();
-  String selectedCity = '';
-  WeatherModel? weather;
-  bool isLoading = true;
-  String? errorMessage;
-  late WeatherRepositoryImpl repo;
-
+  Weather? weather;
+  List<Forecast> hourlyForecast = [];
+  List<Forecast> dailyForecast = [];
+  bool loading = true;
+  String? error;
   bool isDarkMode = false;
-  bool isCelsius = true;
-
-  double? myLat, myLon;
+  late String city;
+  CitySuggestion? selectedCity;
+  final TextEditingController searchController = TextEditingController();
+  late final GetCitySuggestions _getCitySuggestions;
 
   @override
   void initState() {
     super.initState();
-    repo = WeatherRepositoryImpl(
-      WeatherRemoteDataSourceImpl(http.Client(), 'b0ee8bb4ad5a2fc82fcf925a0ac3d3fb'),
-    );
-    _loadWeatherByMyLocation();
+    city = widget.city;
+    searchController.text = city;
+    _getCitySuggestions = sl<GetCitySuggestions>();
+    _loadByCityName(city);
   }
 
-  Future<void> _loadWeatherByMyLocation() async {
+  Future<void> _loadByCitySuggestion(CitySuggestion citySuggest) async {
     setState(() {
-      isLoading = true;
-      errorMessage = null;
+      loading = true;
+      error = null;
+      selectedCity = citySuggest;
+      city = citySuggest.display;
+      searchController.text = citySuggest.display;
     });
-
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) throw Exception('Chưa bật dịch vụ vị trí trên thiết bị!');
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) throw Exception('Thiết bị chưa cấp quyền vị trí');
-      }
-      if (permission == LocationPermission.deniedForever) throw Exception('Thiết bị bị cấm quyền vị trí');
+      final repo = sl<WeatherRepository>();
+      weather = await GetWeather(
+        repo,
+      ).callByLatLon(citySuggest.lat, citySuggest.lon);
+      dailyForecast = await GetDailyForecast(
+        repo,
+      ).callByLatLon(citySuggest.lat, citySuggest.lon);
+      hourlyForecast = await GetHourlyForecast(
+        repo,
+      ).callByLatLon(citySuggest.lat, citySuggest.lon, DateTime.now());
+    } catch (e) {
+      error = '$e';
+    }
+    setState(() {
+      loading = false;
+    });
+  }
 
-      final pos = await Geolocator.getCurrentPosition();
-      myLat = pos.latitude;
-      myLon = pos.longitude;
-      // Lấy dự báo bằng lat/lon
-      weather = await repo.getWeatherByLatLon(myLat!, myLon!);
+  Future<void> _loadByCityName(String inputCity) async {
+    setState(() {
+      loading = true;
+      error = null;
+      city = inputCity;
+      searchController.text = inputCity;
+      selectedCity = null;
+    });
+    try {
+      final repo = sl<WeatherRepository>();
+      weather = await GetWeather(repo).call(inputCity);
+      dailyForecast = await GetDailyForecast(repo).call(inputCity);
+      hourlyForecast = await GetHourlyForecast(
+        repo,
+      ).call(inputCity, DateTime.now());
+    } catch (e) {
+      error = '$e';
+    }
+    setState(() {
+      loading = false;
+    });
+  }
 
-      // Lấy tên thực tế địa chỉ để hiển thị trên search box
-      final geocodeUrl = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?lat=$myLat&lon=$myLon&format=json'
+  Future<void> _refreshLocation() async {
+    setState(() => loading = true);
+    String? gpsCity;
+    try {
+      gpsCity = await _getCurrentCity().timeout(Duration(seconds: 10));
+    } catch (_) {}
+    if (gpsCity == null || gpsCity.isEmpty) {
+      gpsCity = widget.city;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Không lấy được vị trí GPS, dùng thành phố mặc định!"),
+        ),
       );
-      final geocodeResponse = await http.get(geocodeUrl, headers: {'User-Agent': 'weather-my-location'});
-      if (geocodeResponse.statusCode == 200) {
-        final data = jsonDecode(geocodeResponse.body);
-        selectedCity = data['display_name'] ?? 'Vị trí của tôi';
-      } else {
-        selectedCity = 'Vị trí của tôi';
-      }
-      _searchController.text = selectedCity;
-    } catch (e) {
-      errorMessage = e.toString();
-      weather = null;
-      selectedCity = '';
     }
-    setState(() {
-      isLoading = false;
-    });
+    _loadByCityName(gpsCity);
   }
 
-  @override
-  void didUpdateWidget(WeatherHomePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.city != null && widget.city != oldWidget.city) {
-      selectedCity = widget.city!;
-      _searchController.text = selectedCity;
-      _loadWeather();
-    }
+  void _showDetail(String title, String detail) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 14),
+            Text(detail, style: TextStyle(fontSize: 17)),
+          ],
+        ),
+      ),
+    );
   }
 
-  Future<void> _loadWeather() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-    });
-
-    try {
-      weather = await repo.getWeatherByCity(selectedCity);
-    } catch (e) {
-      errorMessage = 'Không thể tải dữ liệu thời tiết';
-      weather = null;
-    }
-    setState(() { isLoading = false; });
-  }
-
-  List<Color> _getGradientColors() {
-    if (weather == null) {
-      return [const Color(0xFF4A90E2), const Color(0xFF50B7E8)];
-    }
-
-    final condition = weather!.description.toLowerCase();
-    final hour = DateTime.now().hour;
-
-    if (hour >= 19 || hour < 6) {
-      return [const Color(0xFF0F2027), const Color(0xFF203A43), const Color(0xFF2C5364)];
-    }
-    if (condition.contains('clear') || condition.contains('sun')) {
-      return [const Color(0xFF56CCF2), const Color(0xFF2F80ED)];
-    } else if (condition.contains('cloud')) {
-      return [const Color(0xFF757F9A), const Color(0xFFD7DDE8)];
-    } else if (condition.contains('rain')) {
-      return [const Color(0xFF5374A5), const Color(0xFF3B4F6F)];
-    } else if (condition.contains('snow')) {
-      return [const Color(0xFFE0EAFC), const Color(0xFFCFDEF3)];
-    }
-    return [const Color(0xFF4A90E2), const Color(0xFF50B7E8)];
-  }
-
-  List<Color> _getMainGradientColors() {
-    if (isDarkMode) return [const Color(0xFF232526), const Color(0xFF414345)];
-    return _getGradientColors();
-  }
-
-  int _convertTemp(double tempC) {
-    if (isCelsius) return tempC.round();
-    return (tempC * 1.8 + 32).round();
-  }
-
-  IconData _getWeatherIcon(String description) {
-    final desc = description.toLowerCase();
-    if (desc.contains('clear') || desc.contains('sun')) return Icons.wb_sunny;
-    if (desc.contains('cloud')) return Icons.cloud;
-    if (desc.contains('rain')) return Icons.water_drop;
-    if (desc.contains('snow')) return Icons.ac_unit;
-    if (desc.contains('thunder')) return Icons.flash_on;
-    return Icons.wb_cloudy;
-  }
-
-  String _getDayName(int weekday) {
-    const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
-    return days[weekday - 1];
-  }
-
-  String _getLottieAssetByDesc(String? desc) {
-    if (desc == null) return 'assets/lottie/Sunny.json';
-    final d = desc.toLowerCase();
-    if (d.contains('rain')) return 'assets/lottie/rainy.json';
-    if (d.contains('cloud')) return 'assets/lottie/Clouds.json';
-    if (d.contains('snow')) return 'assets/lottie/snow.json';
-    if (d.contains('sun') || d.contains('clear')) return 'assets/lottie/Sunny.json';
-    return 'assets/lottie/Sunny.json';
-  }
-
-  Future<List<String>> searchCityOpenStreetMap(String pattern) async {
-    final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=$pattern&format=json&addressdetails=1&limit=5');
-    final response = await http.get(url, headers: {'User-Agent': 'weather-app-example'});
-    if (response.statusCode == 200) {
-      final List items = List.from(jsonDecode(response.body) ?? []);
-      return items.map((item) => item['display_name'].toString()).toList();
-    }
-    return [];
+  Widget _smallWeatherBox({
+    required String title,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          margin: EdgeInsets.all(6),
+          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.17),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 27),
+              SizedBox(height: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 6),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final List<Color> _lightGradient = [Color(0xFF75c2ff), Color(0xFF5795ed)];
+    final List<Color> _darkGradient = [Color(0xFF11141c), Color(0xFF23294a)];
+    Color textColorMain = Colors.white;
+    Color bgBlock = Colors.white.withOpacity(0.18);
+
+    final Map<DateTime, List<Forecast>> hourlyDataByDay = {};
+    for (final h in hourlyForecast) {
+      final dayKey = DateTime(
+        h.dateTime.year,
+        h.dateTime.month,
+        h.dateTime.day,
+      );
+      (hourlyDataByDay[dayKey] ??= []).add(h);
+    }
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: SizedBox(
-          width: 230,
-          child: TypeAheadField(
-            textFieldConfiguration: TextFieldConfiguration(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Nhập tên thành phố...',
-                hintStyle: TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.15),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: Icon(Icons.search, color: Colors.white),
-                contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-              ),
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 18),
-            ),
-            suggestionsCallback: (pattern) async {
-              if (pattern.isEmpty) return [];
-              return await searchCityOpenStreetMap(pattern);
-            },
-            itemBuilder: (context, suggestion) {
-              return ListTile(
-                leading: Icon(Icons.location_city, color: Colors.blue),
-                title: Text(suggestion, style: TextStyle(fontWeight: FontWeight.w500)),
-              );
-            },
-            onSuggestionSelected: (suggestion) {
-              setState(() {
-                selectedCity = suggestion;
-              });
-              _searchController.text = suggestion;
-              _loadWeather();
-            },
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDarkMode ? _darkGradient : _lightGradient,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode ? Icons.nightlight : Icons.wb_sunny, color: Colors.white),
-            tooltip: isDarkMode ? 'Light Mode' : 'Dark Mode',
-            onPressed: () => setState(() => isDarkMode = !isDarkMode),
-          ),
-          IconButton(
-            icon: Icon(isCelsius ? Icons.thermostat : Icons.thermostat_auto, color: Colors.white),
-            tooltip: isCelsius ? 'Chuyển sang °F' : 'Chuyển sang °C',
-            onPressed: () => setState(() => isCelsius = !isCelsius),
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_horiz, color: Colors.white),
-            onPressed: () async {
-              // refresh lại đúng GPS khi nhấn vào menu.
-              await _loadWeatherByMyLocation();
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: weather != null
-              ? Lottie.asset(
-                  _getLottieAssetByDesc(weather!.description),
-                  fit: BoxFit.cover,
-                  repeat: true,
-                  animate: true,
-                )
-              : const SizedBox.shrink()
-          ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: _getMainGradientColors(),
-              ),
-            ),
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                : errorMessage != null
-                    ? _buildErrorView()
-                    : _buildWeatherContent(),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.cloud_off, size: 80, color: Colors.white70),
-          const SizedBox(height: 20),
-          Text(
-            errorMessage ?? 'Có lỗi xảy ra',
-            style: const TextStyle(color: Colors.white, fontSize: 18),
-          ),
-          const SizedBox(height: 30),
-          TextButton(
-            onPressed: _loadWeatherByMyLocation,
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.2),
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            ),
-            child: const Text('Thử lại', style: TextStyle(color: Colors.white, fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherContent() {
-    return SafeArea(
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 10),
-              Text(
-                weather!.cityName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w300,
+              // Thanh Search + các nút chức năng
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${_convertTemp(weather!.temperature)}°${isCelsius ? 'C' : 'F'}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 102,
-                  fontWeight: FontWeight.w200,
-                  height: 1,
-                ),
-              ),
-              Text(
-                weather!.description,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'H:${_convertTemp(weather!.maxTemperature)}°${isCelsius ? "C" : "F"} '
-                'L:${_convertTemp(weather!.minTemperature)}°${isCelsius ? "C" : "F"}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 40),
-              _buildHourlyForecastCard(),
-              const SizedBox(height: 20),
-              _buildDailyForecastCard(),
-              const SizedBox(height: 20),
-              _buildWeatherDetailsGrid(),
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHourlyForecastCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.access_time, color: Colors.white70, size: 16),
-              const SizedBox(width: 6),
-              const Text(
-                'DỰ BÁO THEO GIỜ',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const Divider(color: Colors.white30, height: 20),
-          SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: 12,
-              itemBuilder: (context, i) {
-                final hour = (DateTime.now().hour + i) % 24;
-                return Container(
-                  width: 60,
-                  margin: const EdgeInsets.only(right: 12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Text(
-                        i == 0 ? 'Bây giờ' : '${hour.toString().padLeft(2, '0')}:00',
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
-                      ),
-                      Icon(
-                        _getWeatherIcon(weather!.description),
-                        color: i == 0 ? Colors.amber : Colors.white,
-                        size: 28,
-                      ),
-                      Text(
-                        '${_convertTemp(weather!.temperature - (i * 0.5))}°${isCelsius ? "C" : "F"}',
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDailyForecastCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
-              const SizedBox(width: 6),
-              const Text(
-                'DỰ BÁO 10 NGÀY',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const Divider(color: Colors.white30, height: 20),
-          ...List.generate(7, (i) {
-            final day = DateTime.now().add(Duration(days: i));
-            final dayName = i == 0 ? 'Hôm nay' : _getDayName(day.weekday);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 60,
-                    child: Text(
-                      dayName,
-                      style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                  Icon(_getWeatherIcon(weather!.description), color: Colors.white, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderThemeData(
-                              trackHeight: 4,
-                              thumbShape: SliderComponentShape.noThumb,
-                              overlayShape: SliderComponentShape.noOverlay,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TypeAheadField<CitySuggestion>(
+                                textFieldConfiguration: TextFieldConfiguration(
+                                  controller: searchController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Nhập tên thành phố...',
+                                    border: InputBorder.none,
+                                    icon: Icon(
+                                      Icons.search,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: TextStyle(color: Colors.black87),
+                                ),
+                                suggestionsCallback: (pattern) =>
+                                    _getCitySuggestions(pattern),
+                                itemBuilder: (context, suggestion) =>
+                                    ListTile(title: Text(suggestion.display)),
+                                onSuggestionSelected: (suggestion) {
+                                  searchController.text = suggestion.display;
+                                  selectedCity = suggestion;
+                                  _loadByCitySuggestion(suggestion);
+                                },
+                              ),
                             ),
-                            child: Slider(
-                              value: 0.6,
-                              onChanged: (v) {},
-                              activeColor: Colors.amber,
-                              inactiveColor: Colors.blue[300],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    // Nút Thêm thành phố yêu thích
+                    IconButton(
+                      icon: Icon(
+                        Icons.add_location_alt,
+                        color: Colors.amberAccent,
+                      ),
+                      tooltip: 'Thêm thành phố yêu thích',
+                      onPressed: () {
+                        context.go('/favorites');
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.location_searching, color: Colors.white),
+                      tooltip: "Về vị trí hiện tại",
+                      onPressed: _refreshLocation,
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        isDarkMode ? Icons.brightness_7 : Icons.nights_stay,
+                        color: Colors.white,
+                      ),
+                      tooltip: isDarkMode ? 'Chuyển sáng' : 'Chuyển tối',
+                      onPressed: () => setState(() => isDarkMode = !isDarkMode),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.map, color: Colors.white),
+                      tooltip: "Xem bản đồ thời tiết",
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => WeatherMapPage()),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              if (loading)
+                Expanded(child: Center(child: CircularProgressIndicator()))
+              else if (error != null)
+                Expanded(
+                  child: Center(
+                    child: Text(error!, style: TextStyle(color: Colors.red)),
+                  ),
+                )
+              else
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 18, bottom: 10),
+                          child: CurrentWeatherWidget(
+                            weather: weather!,
+                            darkMode: isDarkMode,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 5,
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: bgBlock,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 14,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Dự báo theo giờ',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColorMain,
+                                  ),
+                                ),
+                                SizedBox(height: 7),
+                                HourlyForecastWidget(
+                                  hourlyData: hourlyForecast,
+                                  darkMode: isDarkMode,
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 4,
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: bgBlock,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            padding: EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Dự báo 5 ngày tới',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColorMain,
+                                  ),
+                                ),
+                                DailyForecastWidget(
+                                  dailyData: dailyForecast.take(5).toList(),
+                                  darkMode: isDarkMode,
+                                  hourlyDataByDay:
+                                      hourlyDataByDay, // bắt buộc truyền map này!
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (weather != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                _smallWeatherBox(
+                                  title: 'ĐỘ ẨM',
+                                  value: '${weather!.humidity}%',
+                                  icon: Icons.water_drop,
+                                  onTap: () => _showDetail(
+                                    'Độ Ẩm',
+                                    'Độ ẩm không khí hiện tại là ${weather!.humidity}%',
+                                  ),
+                                ),
+                                _smallWeatherBox(
+                                  title: 'CẢM GIÁC',
+                                  value:
+                                      '${weather!.feelsLike.toStringAsFixed(0)}°C',
+                                  icon: Icons.thermostat,
+                                  onTap: () => _showDetail(
+                                    'Cảm Giác Thực Tế',
+                                    'Nhiệt độ cảm nhận thực tế: ${weather!.feelsLike}°C',
+                                  ),
+                                ),
+                                _smallWeatherBox(
+                                  title: 'ÁP SUẤT',
+                                  value: '${weather!.pressure} hPa',
+                                  icon: Icons.speed,
+                                  onTap: () => _showDetail(
+                                    'Áp Suất Khí Quyển',
+                                    'Áp suất không khí hiện tại là ${weather!.pressure} hPa',
+                                  ),
+                                ),
+                                _smallWeatherBox(
+                                  title: 'TÌNH TRẠNG',
+                                  value: weather!.description.toUpperCase(),
+                                  icon: Icons.cloud,
+                                  onTap: () => _showDetail(
+                                    'Tình Trạng Thời Tiết',
+                                    'Trạng thái hiện tại: ${weather!.description}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${_convertTemp(weather!.minTemperature - i)}°${isCelsius ? "C" : "F"}',
-                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 17, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '${_convertTemp(weather!.maxTemperature - i)}°${isCelsius ? "C" : "F"}',
-                    style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherDetailsGrid() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: _buildDetailCard('ĐỘ ẨM', '${weather!.humidity}%', Icons.water_drop)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildDetailCard('CẢM GIÁC', '${_convertTemp(weather!.feelsLike)}°${isCelsius ? "C" : "F"}', Icons.thermostat)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _buildDetailCard('ÁP SUẤT', '${weather!.pressure} hPa', Icons.compress)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildDetailCard('TÌNH TRẠNG', weather!.description.toUpperCase(), Icons.cloud)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailCard(String title, String value, IconData icon) {
-    return Container(
-      height: 150,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 0.5),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white, size: 28),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
+                ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
