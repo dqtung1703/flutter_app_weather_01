@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:math' as math;
 import '../../../../core/di/app_locator.dart'; // Tùy cấu trúc project
 import '../../domain/entities/weather.dart';
 import '../../domain/entities/forecast.dart';
@@ -14,10 +15,13 @@ import '../../domain/usecases/get_hourly_forecast.dart';
 import '../../domain/repositories/weather_repository.dart';
 import '../../domain/usecases/get_city_suggestions.dart';
 import '../../presentation/pages/weather_map_page.dart';
-import '../pages/daily_detail_page.dart';
 import '../widgets/current_weather_widget.dart';
 import '../widgets/hourly_forecast_widget.dart';
 import '../widgets/daily_forecast_widget.dart';
+import '../widgets/hourly_humidity_chart.dart';
+import '../widgets/hourly_pressure_chart.dart';
+import '../widgets/hourly_feels_like_chart.dart';
+import '../widgets/hourly_rain_chart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -178,30 +182,65 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
     _loadByCityName(gpsCity);
   }
 
-  void _showDetail(String title, String detail) {
+  // Magnus approximation for dew point in Celsius
+  double _dewPointC(double tC, int rhPercent) {
+    final rh = rhPercent.clamp(0, 100) / 100.0;
+    if (rh <= 0) return -50.0; // avoid log(0)
+    const a = 17.27;
+    const b = 237.7; // °C
+    final gamma = (a * tC) / (b + tC) + math.log(rh);
+    return (b * gamma) / (a - gamma);
+  }
+
+  void _showWidgetSheet({
+    required String title,
+    required Widget child,
+    bool showSeeAll = false,
+    Widget? header,
+  }) {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       backgroundColor: Colors.white,
       builder: (_) => Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (showSeeAll)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      // TODO: điều hướng trang chi tiết nếu có
+                    },
+                    child: const Text('Xem tất cả'),
+                  ),
+              ],
             ),
-            SizedBox(height: 14),
-            Text(detail, style: TextStyle(fontSize: 17)),
+            if (header != null) ...[
+              const SizedBox(height: 6),
+              header,
+            ],
+            const SizedBox(height: 10),
+            SizedBox(height: 220, child: child),
           ],
         ),
       ),
     );
   }
+
+  // removed: old _showDetail bottom sheet (replaced by chart bottom sheets)
 
   Widget _smallWeatherBox({
     required String title,
@@ -464,37 +503,56 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                                   title: 'ĐỘ ẨM',
                                   value: '${weather!.humidity}%',
                                   icon: Icons.water_drop,
-                                  onTap: () => _showDetail(
-                                    'Độ Ẩm',
-                                    'Độ ẩm không khí hiện tại là ${weather!.humidity}%',
-                                  ),
+                                  onTap: () {
+                                    final hum = weather!.humidity;
+                                    final t = weather!.temperature;
+                                    final dew = _dewPointC(t, hum).round();
+                                    _showWidgetSheet(
+                                      title: 'Độ ẩm theo giờ',
+                                      header: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${hum}%',
+                                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Điểm sương: ${dew}°',
+                                            style: const TextStyle(color: Colors.black54, fontSize: 14, fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                      child: HourlyHumidityChart(hourlyList: hourlyForecast),
+                                    );
+                                  },
                                 ),
                                 _smallWeatherBox(
                                   title: 'CẢM GIÁC',
                                   value:
                                       '${weather!.feelsLike.toStringAsFixed(0)}°C',
                                   icon: Icons.thermostat,
-                                  onTap: () => _showDetail(
-                                    'Cảm Giác Thực Tế',
-                                    'Nhiệt độ cảm nhận thực tế: ${weather!.feelsLike}°C',
+                                  onTap: () => _showWidgetSheet(
+                                    title: 'Cảm giác theo giờ',
+                                    child: HourlyFeelsLikeChart(hourlyList: hourlyForecast),
                                   ),
                                 ),
                                 _smallWeatherBox(
                                   title: 'ÁP SUẤT',
                                   value: '${weather!.pressure} hPa',
                                   icon: Icons.speed,
-                                  onTap: () => _showDetail(
-                                    'Áp Suất Khí Quyển',
-                                    'Áp suất không khí hiện tại là ${weather!.pressure} hPa',
+                                  onTap: () => _showWidgetSheet(
+                                    title: 'Áp suất theo giờ',
+                                    child: HourlyPressureChart(hourlyList: hourlyForecast),
                                   ),
                                 ),
                                 _smallWeatherBox(
                                   title: 'TÌNH TRẠNG',
                                   value: weather!.description.toUpperCase(),
                                   icon: Icons.cloud,
-                                  onTap: () => _showDetail(
-                                    'Tình Trạng Thời Tiết',
-                                    'Trạng thái hiện tại: ${weather!.description}',
+                                  onTap: () => _showWidgetSheet(
+                                    title: 'Khả năng mưa theo giờ',
+                                    child: HourlyRainChanceChart(hourlyList: hourlyForecast),
                                   ),
                                 ),
                               ],
