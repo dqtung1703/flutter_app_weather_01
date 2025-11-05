@@ -19,6 +19,10 @@ import '../widgets/hourly_forecast_widget.dart';
 import '../widgets/daily_forecast_widget.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../widgets/humidity_chart_widget.dart';
+import '../widgets/feels_like_chart_widget.dart';
+import '../widgets/pressure_chart_widget.dart';
+import '../widgets/weather_condition_chart_widget.dart';
 
 // Hàm lấy vị trí qua GPS (dùng cho refresh location)
 Future<String?> _getCurrentCity() async {
@@ -470,9 +474,21 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                                   title: 'ĐỘ ẨM',
                                   value: '${weather!.humidity}%',
                                   icon: Icons.water_drop,
-                                  onTap: () => _showDetail(
-                                    'Độ Ẩm',
-                                    'Độ ẩm không khí hiện tại là ${weather!.humidity}%',
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => Scaffold(
+                                        appBar: AppBar(
+                                          title: Text('Độ ẩm theo giờ'),
+                                        ),
+                                        body: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: HumidityChartWidget(
+                                            hourlyList: hourlyForecast,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 _smallWeatherBox(
@@ -480,27 +496,66 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                                   value:
                                       '${weather!.feelsLike.toStringAsFixed(0)}°C',
                                   icon: Icons.thermostat,
-                                  onTap: () => _showDetail(
-                                    'Cảm Giác Thực Tế',
-                                    'Nhiệt độ cảm nhận thực tế: ${weather!.feelsLike}°C',
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => Scaffold(
+                                        appBar: AppBar(
+                                          title: Text('Cảm giác theo giờ'),
+                                        ),
+                                        body: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: FeelsLikeChartWidget(
+                                            hourlyList: hourlyForecast,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 _smallWeatherBox(
                                   title: 'ÁP SUẤT',
                                   value: '${weather!.pressure} hPa',
                                   icon: Icons.speed,
-                                  onTap: () => _showDetail(
-                                    'Áp Suất Khí Quyển',
-                                    'Áp suất không khí hiện tại là ${weather!.pressure} hPa',
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => Scaffold(
+                                        appBar: AppBar(
+                                          title: Text('Áp suất theo giờ'),
+                                        ),
+                                        body: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: PressureChartWidget(
+                                            hourlyList: hourlyForecast,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 _smallWeatherBox(
                                   title: 'TÌNH TRẠNG',
-                                  value: weather!.description.toUpperCase(),
+                                  value:
+                                      weather!.description?.toUpperCase() ?? '',
                                   icon: Icons.cloud,
-                                  onTap: () => _showDetail(
-                                    'Tình Trạng Thời Tiết',
-                                    'Trạng thái hiện tại: ${weather!.description}',
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => Scaffold(
+                                        appBar: AppBar(
+                                          title: Text(
+                                            'Tình trạng mây theo giờ',
+                                          ),
+                                        ),
+                                        body: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: WeatherConditionChartWidget(
+                                            hourlyList: hourlyForecast,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],

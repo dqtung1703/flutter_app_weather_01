@@ -9,7 +9,6 @@ import '../../domain/repositories/favorite_city_repository.dart';
 import '../../../weather/domain/entities/city_suggestion.dart';
 import '../../../weather/domain/usecases/get_city_suggestions.dart';
 
-// Định nghĩa object để truyền extra cho go_router
 class WeatherDetailPageParams {
   final String city;
   final double lat;
@@ -33,6 +32,7 @@ class FavoriteCitiesPage extends StatefulWidget {
 class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
   late final GetCitySuggestions _getCitySuggestions;
   final TextEditingController _cityController = TextEditingController();
+  bool isDarkMode = false; // Luôn không null
 
   @override
   void initState() {
@@ -46,14 +46,33 @@ class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
     final removeFavorite = sl<RemoveFavoriteCity>();
     final repo = sl<FavoriteCityRepository>();
 
+    final bgColor = isDarkMode ? Color(0xFF23294a) : Colors.white;
+    final fgColor = isDarkMode ? Colors.white : Colors.black87;
+    final inputBgColor = isDarkMode ? Color(0xFF32364a) : Colors.white;
+
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text('Thành phố yêu thích'),
+        title: Text('Thành phố yêu thích', style: TextStyle(color: fgColor)),
+        backgroundColor: bgColor,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: fgColor),
           tooltip: "Quay về trang chính",
           onPressed: () => context.go('/home'),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              isDarkMode ? Icons.brightness_7 : Icons.nights_stay,
+              color: fgColor,
+            ),
+            tooltip: isDarkMode ? 'Chế độ sáng' : 'Chế độ tối',
+            onPressed: () => setState(
+              () => isDarkMode = !(isDarkMode ?? false),
+            ), // EP KIEU AN TOAN
+          ),
+        ],
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -62,14 +81,40 @@ class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
             child: TypeAheadField<CitySuggestion>(
               textFieldConfiguration: TextFieldConfiguration(
                 controller: _cityController,
-                decoration: const InputDecoration(
+                style: TextStyle(color: fgColor),
+                decoration: InputDecoration(
+                  fillColor: inputBgColor,
+                  filled: true,
                   labelText: 'Tìm và thêm thành phố',
+                  labelStyle: TextStyle(color: fgColor),
                   border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: isDarkMode ? Colors.grey : Colors.black54,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: isDarkMode ? Colors.cyanAccent : Colors.blue,
+                      width: 2,
+                    ),
+                  ),
                 ),
               ),
               suggestionsCallback: (pattern) => _getCitySuggestions(pattern),
               itemBuilder: (context, suggestion) {
-                return ListTile(title: Text(suggestion.display));
+                return ListTile(
+                  tileColor: isDarkMode
+                      ? Colors.black
+                      : Colors
+                            .white, // chỉ cần dòng này nếu suggestionsBoxDecoration không đủ
+                  title: Text(
+                    suggestion.display,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black87,
+                    ), // màu chữ nổi bật!
+                  ),
+                );
               },
               onSuggestionSelected: (suggestion) async {
                 await addFavorite(
@@ -81,38 +126,50 @@ class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
                 );
                 _cityController.clear();
               },
-              noItemsFoundBuilder: (context) => const Padding(
+              noItemsFoundBuilder: (context) => Padding(
                 padding: EdgeInsets.all(8),
-                child: Text('Không tìm thấy thành phố phù hợp!'),
+                child: Text(
+                  'Không tìm thấy thành phố phù hợp!',
+                  style: TextStyle(color: fgColor),
+                ),
               ),
             ),
           ),
-          const Divider(),
+          Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
           Expanded(
             child: StreamBuilder<List<FavoriteCity>>(
               stream: repo.getFavoriteCities(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(fgColor),
+                    ),
+                  );
                 }
                 final cities = snapshot.data!;
                 if (cities.isEmpty) {
-                  return const Center(
-                    child: Text('Chưa có thành phố yêu thích nào!'),
+                  return Center(
+                    child: Text(
+                      'Chưa có thành phố yêu thích nào!',
+                      style: TextStyle(color: fgColor),
+                    ),
                   );
                 }
                 return ListView.separated(
                   itemCount: cities.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    color: isDarkMode ? Colors.white24 : Colors.black12,
+                  ),
                   itemBuilder: (context, i) {
                     final city = cities[i];
                     return ListTile(
-                      title: Text(city.name),
+                      title: Text(city.name, style: TextStyle(color: fgColor)),
                       trailing: IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
+                        icon: Icon(Icons.delete, color: Colors.redAccent),
                         onPressed: () => removeFavorite(city.name),
                       ),
-                      // Truyền đủ tham số qua go_router để sang trang detail đúng lat/lon
                       onTap: () => context.go(
                         '/weather_detail',
                         extra: WeatherDetailPageParams(
