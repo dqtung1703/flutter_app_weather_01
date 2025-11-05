@@ -14,7 +14,6 @@ import '../../domain/usecases/get_hourly_forecast.dart';
 import '../../domain/repositories/weather_repository.dart';
 import '../../domain/usecases/get_city_suggestions.dart';
 import '../../presentation/pages/weather_map_page.dart';
-import '../pages/daily_detail_page.dart';
 import '../widgets/current_weather_widget.dart';
 import '../widgets/hourly_forecast_widget.dart';
 import '../widgets/daily_forecast_widget.dart';
@@ -360,6 +359,13 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                           context,
                           MaterialPageRoute(builder: (_) => WeatherMapPage()),
                         );
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.person, color: Colors.white),
+                      tooltip: "Xem Profile",
+                      onPressed: () {
+                        context.go('/profile');
                       },
                     ),
                   ],

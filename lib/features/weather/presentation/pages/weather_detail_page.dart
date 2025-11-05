@@ -5,7 +5,6 @@ import '../../domain/entities/forecast.dart';
 import '../../domain/usecases/get_hourly_forecast.dart';
 import '../../domain/usecases/get_daily_forecast.dart';
 import '../../domain/repositories/weather_repository.dart';
-import 'package:weather_icons/weather_icons.dart';
 
 class WeatherDetailPage extends StatefulWidget {
   final String city;
