@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/forecast.dart';
+import '../pages/daily_detail_page.dart';
 
 class DailyForecastWidget extends StatelessWidget {
   final List<Forecast> dailyData;
   final bool darkMode;
+  final Map<DateTime, List<Forecast>> hourlyDataByDay;
+
   const DailyForecastWidget({
     super.key,
     required this.dailyData,
+    required this.hourlyDataByDay,
     this.darkMode = false,
   });
 
@@ -35,9 +39,7 @@ class DailyForecastWidget extends StatelessWidget {
     }
   }
 
-  String getViDateDay(DateTime d) {
-    return '${d.day}/${d.month}';
-  }
+  String getViDateDay(DateTime d) => '${d.day}/${d.month}';
 
   @override
   Widget build(BuildContext context) {
@@ -56,87 +58,106 @@ class DailyForecastWidget extends StatelessWidget {
           final dayText = getViDayName(f.dateTime);
           final dateText = getViDateDay(f.dateTime);
           final isToday = dayText == 'Hôm nay';
+          final dayKey = DateTime(
+            f.dateTime.year,
+            f.dateTime.month,
+            f.dateTime.day,
+          );
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 80,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        dayText,
-                        style: TextStyle(
-                          color: isToday
-                              ? (darkMode ? Colors.amber : Colors.blueAccent)
-                              : (darkMode ? Colors.white : Colors.black),
-                          fontSize: 17,
-                          fontWeight: isToday
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      Text(
-                        dateText,
-                        style: TextStyle(
-                          color: darkMode ? Colors.white54 : Colors.grey[500],
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
+          return InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DailyForecastPage(
+                    selectedDate: f.dateTime,
+                    hourlyList: hourlyDataByDay[dayKey] ?? [],
                   ),
                 ),
-                _buildWeatherIcon(f),
-                SizedBox(width: 7),
-                Text(
-                  '${f.minTemp.toStringAsFixed(0)}°',
-                  style: TextStyle(
-                    color: darkMode ? Colors.white54 : Colors.black54,
-                    fontSize: 17,
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 12),
-                    height: 8,
-                    child: CustomPaint(
-                      painter: TempBarPainter(
-                        min: f.minTemp,
-                        max: f.maxTemp,
-                        barColor: darkMode
-                            ? Colors.amber[100]!
-                            : Colors.yellowAccent,
-                      ),
-                    ),
-                  ),
-                ),
-                Text(
-                  '${f.maxTemp.toStringAsFixed(0)}°',
-                  style: TextStyle(
-                    color: darkMode ? Colors.amber[100] : Colors.yellowAccent,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (f.rainChance > 0)
-                  Padding(
-                    padding: EdgeInsets.only(left: 8),
-                    child: Row(
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.grain, color: Colors.blue, size: 15),
                         Text(
-                          '${f.rainChance}%',
+                          dayText,
                           style: TextStyle(
-                            color: Colors.blueAccent,
-                            fontWeight: FontWeight.w600,
+                            color: isToday
+                                ? (darkMode ? Colors.amber : Colors.blueAccent)
+                                : (darkMode ? Colors.white : Colors.black),
+                            fontSize: 17,
+                            fontWeight: isToday
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        Text(
+                          dateText,
+                          style: TextStyle(
+                            color: darkMode ? Colors.white54 : Colors.grey[500],
+                            fontSize: 15,
                           ),
                         ),
                       ],
                     ),
                   ),
-              ],
+                  _buildWeatherIcon(f),
+                  SizedBox(width: 7),
+                  Text(
+                    '${f.minTemp.toStringAsFixed(0)}°',
+                    style: TextStyle(
+                      color: darkMode ? Colors.white54 : Colors.black54,
+                      fontSize: 17,
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      height: 8,
+                      child: CustomPaint(
+                        painter: TempBarPainter(
+                          min: f.minTemp,
+                          max: f.maxTemp,
+                          barColor: darkMode
+                              ? Colors.amber[100]!
+                              : Colors.yellowAccent,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${f.maxTemp.toStringAsFixed(0)}°',
+                    style: TextStyle(
+                      color: darkMode ? Colors.amber[100] : Colors.yellowAccent,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (f.rainChance > 0)
+                    Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.grain, color: Colors.blue, size: 15),
+                          Text(
+                            '${f.rainChance}%',
+                            style: TextStyle(
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         },
@@ -146,16 +167,28 @@ class DailyForecastWidget extends StatelessWidget {
 
   Widget _buildWeatherIcon(Forecast f) {
     final desc = (f as dynamic).description?.toLowerCase() ?? '';
-    if (desc.contains('rain')) {
+    if (desc.contains('rain') ||
+        desc.contains('shower') ||
+        desc.contains('mưa')) {
       return Icon(Icons.umbrella, color: Colors.blueAccent);
     }
-    if (desc.contains('cloud')) {
-      return Icon(Icons.cloud, color: Colors.blueGrey[100]);
+    if (desc.contains('storm') || desc.contains('thunder')) {
+      return Icon(Icons.flash_on, color: Colors.deepPurpleAccent);
     }
-    if (desc.contains('sun') || desc.contains('clear')) {
+    if (desc.contains('snow') || desc.contains('tuyết')) {
+      return Icon(Icons.ac_unit, color: Colors.blue[200]);
+    }
+    if (desc.contains('sun') ||
+        desc.contains('clear') ||
+        desc.contains('nắng')) {
       return Icon(Icons.wb_sunny, color: Colors.amber);
     }
-    return Icon(Icons.cloud, color: Colors.blueGrey);
+    if (desc.contains('cloud') ||
+        desc.contains('overcast') ||
+        desc.contains('mây')) {
+      return Icon(Icons.cloud, color: Colors.blueGrey[100]);
+    }
+    return Icon(Icons.cloud, color: Colors.blueGrey); // fallback default
   }
 }
 

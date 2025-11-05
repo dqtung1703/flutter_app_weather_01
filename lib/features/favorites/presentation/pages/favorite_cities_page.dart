@@ -8,6 +8,7 @@ import '../../domain/usecases/remove_favorite_city.dart';
 import '../../domain/repositories/favorite_city_repository.dart';
 import '../../../weather/domain/entities/city_suggestion.dart';
 import '../../../weather/domain/usecases/get_city_suggestions.dart';
+
 // Định nghĩa object để truyền extra cho go_router
 class WeatherDetailPageParams {
   final String city;
@@ -71,11 +72,13 @@ class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
                 return ListTile(title: Text(suggestion.display));
               },
               onSuggestionSelected: (suggestion) async {
-                await addFavorite(FavoriteCity(
-                  suggestion.display,
-                  suggestion.lat,
-                  suggestion.lon,
-                ));
+                await addFavorite(
+                  FavoriteCity(
+                    suggestion.display,
+                    suggestion.lat,
+                    suggestion.lon,
+                  ),
+                );
                 _cityController.clear();
               },
               noItemsFoundBuilder: (context) => const Padding(
@@ -111,14 +114,14 @@ class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
                       ),
                       // Truyền đủ tham số qua go_router để sang trang detail đúng lat/lon
                       onTap: () => context.go(
-        '/weather_detail',
-        extra: WeatherDetailPageParams(
-          city: city.name,
-          lat: city.lat,
-          lon: city.lon,
-          day: DateTime.now(),
-        ),
-      ),
+                        '/weather_detail',
+                        extra: WeatherDetailPageParams(
+                          city: city.name,
+                          lat: city.lat,
+                          lon: city.lon,
+                          day: DateTime.now(),
+                        ),
+                      ),
                     );
                   },
                 );
