@@ -15,7 +15,7 @@ class WeatherApiDatasource {
 
   Future<WeatherModel> fetchWeather(String city) async {
     final url =
-        '${ApiConstants.baseUrl}weather?q=$city&appid=$apiKey&units=metric';
+        '${ApiConstants.baseUrl}weather?q=$city&appid=$apiKey&units=metric&lang=vi'; // SỬA
     final res = await client.get(Uri.parse(url));
     if (res.statusCode != 200) {
       print("Weather error URL: $url");
@@ -45,7 +45,7 @@ class WeatherApiDatasource {
     DateTime day,
   ) async {
     final url =
-        '${ApiConstants.baseUrl}forecast?q=$city&appid=$apiKey&units=metric';
+        '${ApiConstants.baseUrl}forecast?q=$city&appid=$apiKey&units=metric&lang=vi'; // SỬA
     final res = await client.get(Uri.parse(url));
     if (res.statusCode != 200) {
       print("Weather error URL: $url");
@@ -111,7 +111,7 @@ class WeatherApiDatasource {
   /// Daily forecast by city: group theo ngày từ /forecast như trên
   Future<List<ForecastModel>> fetchDailyForecast(String city) async {
     final url =
-        '${ApiConstants.baseUrl}forecast?q=$city&appid=$apiKey&units=metric';
+        '${ApiConstants.baseUrl}forecast?q=$city&appid=$apiKey&units=metric&lang=vi'; // SỬA
     final res = await client.get(Uri.parse(url));
     if (res.statusCode != 200) {
       print("Weather error URL: $url");

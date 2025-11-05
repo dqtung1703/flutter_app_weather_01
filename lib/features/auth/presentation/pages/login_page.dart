@@ -15,6 +15,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _loading = false;
+  bool _showPassword = false; // trạng thái ẩn/hiện mật khẩu
 
   Future<void> _login() async {
     setState(() => _loading = true);
@@ -112,10 +113,18 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
+              obscureText: !_showPassword,
+              decoration: InputDecoration(
                 labelText: 'Mật khẩu',
                 prefixIcon: Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showPassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() => _showPassword = !_showPassword);
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 24),
