@@ -33,7 +33,7 @@ class _FavoriteCitiesPageState extends State<FavoriteCitiesPage> {
   late final GetCitySuggestions _getCitySuggestions;
   final TextEditingController _cityController = TextEditingController();
   bool isDarkMode = false; // Luôn không null
-
+  
   @override
   void initState() {
     super.initState();
