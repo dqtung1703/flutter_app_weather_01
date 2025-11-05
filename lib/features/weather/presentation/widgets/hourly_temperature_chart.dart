@@ -33,7 +33,7 @@ class HourlyTemperatureChart extends StatelessWidget {
                 reservedSize: 32,
                 getTitlesWidget: (value, meta) => Text(
                   "${value.toInt()}°",
-                  style: TextStyle(color: Colors.white70, fontSize: 12),  
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 interval: 3,
               ),
@@ -56,4 +56,3 @@ class HourlyTemperatureChart extends StatelessWidget {
     );
   }
 }
-//ko co gì

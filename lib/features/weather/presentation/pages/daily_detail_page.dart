@@ -116,10 +116,10 @@ class DailyForecastPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color.fromARGB(0, 239, 235, 235),
         title: Text(
           "Chi tiết ngày ${DateFormat('EEEE, dd/MM/yyyy', 'vi').format(selectedDate)}",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: ListView(
@@ -134,7 +134,10 @@ class DailyForecastPage extends StatelessWidget {
             ),
             child: Text(
               summary,
-              style: TextStyle(fontSize: 15, color: Colors.white),
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.white,
+              ), // màu trắng rõ nét
             ),
           ),
           Row(
