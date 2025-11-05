@@ -70,7 +70,7 @@ class _HomeLocationRedirectorState extends State<HomeLocationRedirector> {
     }
 
     // Điều hướng bằng GoRouter, truyền tên city qua extra
-    GoRouter.of(context).go(AppRoutes.home, extra: gpsCity ?? "Unknown");
+  GoRouter.of(context).go(AppRoutes.home, extra: gpsCity);
     // Nếu context.go không có extension, always dùng GoRouter.of(context).go()
   }
 
