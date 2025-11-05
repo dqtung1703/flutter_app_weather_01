@@ -7,7 +7,8 @@ class Forecast {
   final double windSpeed;
   final int pressure;
   final int rainChance;
-  final String? description; // BỔ SUNG TRƯỜNG NÀY!!!
+  final double? rainVolume; // <-- Thêm dòng này!
+  final String? description;
   final int? aqi;
   final int? uvIndex;
   final String? dayName;
@@ -21,7 +22,8 @@ class Forecast {
     required this.windSpeed,
     required this.pressure,
     required this.rainChance,
-    this.description, // BỔ SUNG
+    this.rainVolume, // <-- và thêm ở đây!
+    this.description,
     this.aqi,
     this.uvIndex,
     this.dayName,

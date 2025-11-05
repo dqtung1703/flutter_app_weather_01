@@ -14,7 +14,7 @@ import '../../domain/usecases/get_hourly_forecast.dart';
 import '../../domain/repositories/weather_repository.dart';
 import '../../domain/usecases/get_city_suggestions.dart';
 import '../../presentation/pages/weather_map_page.dart';
-
+import '../pages/daily_detail_page.dart';
 import '../widgets/current_weather_widget.dart';
 import '../widgets/hourly_forecast_widget.dart';
 import '../widgets/daily_forecast_widget.dart';
@@ -260,6 +260,15 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
     Color textColorMain = Colors.white;
     Color bgBlock = Colors.white.withOpacity(0.18);
 
+    final Map<DateTime, List<Forecast>> hourlyDataByDay = {};
+    for (final h in hourlyForecast) {
+      final dayKey = DateTime(
+        h.dateTime.year,
+        h.dateTime.month,
+        h.dateTime.day,
+      );
+      (hourlyDataByDay[dayKey] ??= []).add(h);
+    }
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
@@ -436,6 +445,8 @@ class _WeatherHomePageState extends State<WeatherHomePage> {
                                 DailyForecastWidget(
                                   dailyData: dailyForecast.take(5).toList(),
                                   darkMode: isDarkMode,
+                                  hourlyDataByDay:
+                                      hourlyDataByDay, // bắt buộc truyền map này!
                                 ),
                               ],
                             ),

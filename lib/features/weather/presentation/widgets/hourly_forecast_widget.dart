@@ -88,9 +88,19 @@ class HourlyForecastWidget extends StatelessWidget {
 
   IconData _getWeatherIcon(String desc) {
     desc = desc.toLowerCase();
-    if (desc.contains('rain')) return Icons.umbrella;
-    if (desc.contains('cloud')) return Icons.cloud;
-    if (desc.contains('sun') || desc.contains('clear')) return Icons.wb_sunny;
+    if (desc.contains('rain') ||
+        desc.contains('shower') ||
+        desc.contains('mưa'))
+      return Icons.umbrella;
+    if (desc.contains('storm') || desc.contains('thunder'))
+      return Icons.flash_on;
+    if (desc.contains('snow') || desc.contains('tuyết')) return Icons.ac_unit;
+    if (desc.contains('sun') || desc.contains('clear') || desc.contains('nắng'))
+      return Icons.wb_sunny;
+    if (desc.contains('cloud') ||
+        desc.contains('overcast') ||
+        desc.contains('mây'))
+      return Icons.cloud;
     return Icons.cloud;
   }
 }

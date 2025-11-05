@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/routing/app_go_router.dart';
 import 'core/config/firebase_env.dart';
 import 'core/di/app_locator.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,7 @@ void main() async {
       measurementId: FirebaseEnv.measurementId,
     ),
   );
+  await initializeDateFormatting('vi', null);
   setupLocator();
   runApp(const MyApp());
 }

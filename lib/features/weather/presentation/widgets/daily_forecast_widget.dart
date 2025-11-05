@@ -5,13 +5,13 @@ import '../pages/daily_detail_page.dart';
 class DailyForecastWidget extends StatelessWidget {
   final List<Forecast> dailyData;
   final bool darkMode;
-  // Thêm dữ liệu hourly forecasts: Map<Date, List<Forecast>>
-  final Map<DateTime, List<Forecast>>? hourlyByDay;
+  final Map<DateTime, List<Forecast>> hourlyDataByDay;
+
   const DailyForecastWidget({
     super.key,
     required this.dailyData,
+    required this.hourlyDataByDay,
     this.darkMode = false,
-    this.hourlyByDay,
   });
 
   String getViDayName(DateTime d) {
@@ -39,9 +39,7 @@ class DailyForecastWidget extends StatelessWidget {
     }
   }
 
-  String getViDateDay(DateTime d) {
-    return '${d.day}/${d.month}';
-  }
+  String getViDateDay(DateTime d) => '${d.day}/${d.month}';
 
   @override
   Widget build(BuildContext context) {
@@ -60,26 +58,21 @@ class DailyForecastWidget extends StatelessWidget {
           final dayText = getViDayName(f.dateTime);
           final dateText = getViDateDay(f.dateTime);
           final isToday = dayText == 'Hôm nay';
-
-          // Data hourly cho ngày này nếu cần truyền qua chi tiết (nếu không có có thể bỏ)
-          final List<Forecast> hourlyForThisDay = hourlyByDay != null
-              ? (hourlyByDay![DateTime(
-                      f.dateTime.year,
-                      f.dateTime.month,
-                      f.dateTime.day,
-                    )] ??
-                    [])
-              : [];
+          final dayKey = DateTime(
+            f.dateTime.year,
+            f.dateTime.month,
+            f.dateTime.day,
+          );
 
           return InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => DailyDetailPage(
-                    forecast: f,
-                    hourlyForecast: hourlyForThisDay,
+                  builder: (_) => DailyForecastPage(
+                    selectedDate: f.dateTime,
+                    hourlyList: hourlyDataByDay[dayKey] ?? [],
                   ),
                 ),
               );
@@ -174,16 +167,28 @@ class DailyForecastWidget extends StatelessWidget {
 
   Widget _buildWeatherIcon(Forecast f) {
     final desc = (f as dynamic).description?.toLowerCase() ?? '';
-    if (desc.contains('rain')) {
+    if (desc.contains('rain') ||
+        desc.contains('shower') ||
+        desc.contains('mưa')) {
       return Icon(Icons.umbrella, color: Colors.blueAccent);
     }
-    if (desc.contains('cloud')) {
-      return Icon(Icons.cloud, color: Colors.blueGrey[100]);
+    if (desc.contains('storm') || desc.contains('thunder')) {
+      return Icon(Icons.flash_on, color: Colors.deepPurpleAccent);
     }
-    if (desc.contains('sun') || desc.contains('clear')) {
+    if (desc.contains('snow') || desc.contains('tuyết')) {
+      return Icon(Icons.ac_unit, color: Colors.blue[200]);
+    }
+    if (desc.contains('sun') ||
+        desc.contains('clear') ||
+        desc.contains('nắng')) {
       return Icon(Icons.wb_sunny, color: Colors.amber);
     }
-    return Icon(Icons.cloud, color: Colors.blueGrey);
+    if (desc.contains('cloud') ||
+        desc.contains('overcast') ||
+        desc.contains('mây')) {
+      return Icon(Icons.cloud, color: Colors.blueGrey[100]);
+    }
+    return Icon(Icons.cloud, color: Colors.blueGrey); // fallback default
   }
 }
 

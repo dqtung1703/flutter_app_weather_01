@@ -1,87 +1,75 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../domain/entities/forecast.dart';
+import '../widgets/hourly_temperature_chart.dart';
+import 'package:intl/intl.dart';
 
-// Widget vẽ biểu đồ nhiệt độ giờ (line chart)
-class HourlyWeatherChart extends StatelessWidget {
-  final List<Forecast> hourlyData;
-  const HourlyWeatherChart({Key? key, required this.hourlyData})
-    : super(key: key);
+class HourlyRainChanceChart extends StatelessWidget {
+  final List<Forecast> hourlyList;
+  const HourlyRainChanceChart({required this.hourlyList, super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (hourlyData.isEmpty)
-      return Text(
-        'Không có dữ liệu từng giờ',
-        style: TextStyle(color: Colors.white),
+    if (hourlyList.isEmpty) {
+      return Center(
+        child: Text(
+          "Không có dữ liệu mưa từng giờ",
+          style: TextStyle(color: Colors.white),
+        ),
       );
-    final colorLine = Colors.yellowAccent;
-    final spots = hourlyData
-        .map((f) => FlSpot(f.dateTime.hour.toDouble(), f.temperature))
+    }
+    final spots = hourlyList
+        .map((h) => FlSpot(h.dateTime.hour.toDouble(), h.rainChance.toDouble()))
         .toList();
-    return Container(
-      height: 170,
-      padding: EdgeInsets.only(top: 18, left: 10, right: 10),
+
+    return SizedBox(
+      height: 172,
       child: LineChart(
         LineChartData(
-          backgroundColor: Colors.transparent,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: true,
-            getDrawingHorizontalLine: (value) =>
-                FlLine(color: Colors.white10, strokeWidth: 1),
-            getDrawingVerticalLine: (value) =>
-                FlLine(color: Colors.white10, strokeWidth: 1),
-          ),
+          minY: 0,
+          maxY: 100,
           titlesData: FlTitlesData(
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
+                reservedSize: 36,
                 getTitlesWidget: (value, meta) => Text(
-                  '${value.toInt()}°',
-                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                  '${value.toInt()}%',
+                  style: TextStyle(color: Colors.blue[200], fontSize: 12),
                 ),
               ),
             ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 24,
-                getTitlesWidget: (value, meta) => Text(
+                interval: 3,
+                getTitlesWidget: (value, _) => Text(
                   '${value.toInt()}h',
-                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                  style: TextStyle(color: Colors.blue[100], fontSize: 12),
                 ),
               ),
             ),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
-          borderData: FlBorderData(
+          gridData: FlGridData(
             show: true,
-            border: Border.all(color: Colors.white24),
+            horizontalInterval: 20,
+            getDrawingHorizontalLine: (value) =>
+                FlLine(color: Colors.white12, strokeWidth: 1),
           ),
-          minY:
-              hourlyData
-                  .map((f) => f.temperature)
-                  .reduce((a, b) => a < b ? a : b) -
-              2,
-          maxY:
-              hourlyData
-                  .map((f) => f.temperature)
-                  .reduce((a, b) => a > b ? a : b) +
-              2,
+          borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              color: colorLine,
+              color: Colors.lightBlueAccent,
               barWidth: 3,
-              dotData: FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: colorLine.withOpacity(0.2),
+                color: Colors.lightBlueAccent.withOpacity(0.28),
               ),
+              dotData: FlDotData(show: false),
             ),
           ],
         ),
@@ -90,248 +78,148 @@ class HourlyWeatherChart extends StatelessWidget {
   }
 }
 
-// Trang chi tiết từng ngày UI hiện đại
-class DailyDetailPage extends StatelessWidget {
-  final Forecast forecast;
-  final List<Forecast> hourlyForecast;
+class DailyForecastPage extends StatelessWidget {
+  final DateTime selectedDate;
+  final List<Forecast> hourlyList;
+  const DailyForecastPage({
+    required this.selectedDate,
+    required this.hourlyList,
+    super.key,
+  });
 
-  const DailyDetailPage({
-    Key? key,
-    required this.forecast,
-    required this.hourlyForecast,
-  }) : super(key: key);
-
-  String getViDayName(DateTime d) {
-    final weekday = d.weekday;
-    switch (weekday) {
-      case DateTime.monday:
-        return 'Thứ 2';
-      case DateTime.tuesday:
-        return 'Thứ 3';
-      case DateTime.wednesday:
-        return 'Thứ 4';
-      case DateTime.thursday:
-        return 'Thứ 5';
-      case DateTime.friday:
-        return 'Thứ 6';
-      case DateTime.saturday:
-        return 'Thứ 7';
-      case DateTime.sunday:
-        return 'CN';
-      default:
-        return '';
-    }
-  }
+  double get maxTemp => hourlyList.isNotEmpty
+      ? hourlyList.map((e) => e.temperature).reduce((a, b) => a > b ? a : b)
+      : 0;
+  double get minTemp => hourlyList.isNotEmpty
+      ? hourlyList.map((e) => e.temperature).reduce((a, b) => a < b ? a : b)
+      : 0;
+  double get avgHumidity => hourlyList.isNotEmpty
+      ? hourlyList.map((e) => e.humidity).reduce((a, b) => a + b) /
+            hourlyList.length
+      : 0;
+  int get maxRainChance => hourlyList.isNotEmpty
+      ? hourlyList.map((e) => e.rainChance).reduce((a, b) => a > b ? a : b)
+      : 0;
+  double get totalRainVolume => hourlyList.isNotEmpty
+      ? hourlyList
+            .map((e) => e.rainVolume ?? 0)
+            .fold<double>(0, (prev, v) => prev + v)
+      : 0;
 
   @override
   Widget build(BuildContext context) {
+    final String summary =
+        "Trong ngày ${DateFormat('dd/MM', 'vi').format(selectedDate)}: "
+        "Nhiệt độ cao nhất ${maxTemp.round()}°C, thấp nhất ${minTemp.round()}°C. "
+        "Độ ẩm trung bình: ${avgHumidity.round()}%.";
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text('Điều kiện thời tiết', style: TextStyle(fontSize: 20)),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.close, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Text(
+          "Chi tiết ngày ${DateFormat('EEEE, dd/MM/yyyy', 'vi').format(selectedDate)}",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 16, 14, 0),
+        children: [
+          Container(
+            padding: EdgeInsets.all(12),
+            margin: EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: Colors.white12,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              summary,
+              style: TextStyle(fontSize: 15, color: Colors.white),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Phần ngày và nút chọn các ngày
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ...List.generate(
-                      7, // Bạn muốn bao nhiêu thì chỉnh ở đây (có thể truyền List<DateTime> vào)
-                      (i) => GestureDetector(
-                        child: Container(
-                          margin: EdgeInsets.symmetric(horizontal: 4),
-                          padding: EdgeInsets.symmetric(
-                            vertical: 5,
-                            horizontal: 11,
-                          ),
-                          decoration: BoxDecoration(
-                            color: (forecast.dateTime.weekday == i + 1)
-                                ? Colors.white10
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Text(
-                            ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][i],
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: forecast.dateTime.weekday == i + 1
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Center(
-                child: Text(
-                  '${getViDayName(forecast.dateTime)}, ngày ${forecast.dateTime.day} tháng ${forecast.dateTime.month} ${forecast.dateTime.year}',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Column(
                 children: [
                   Text(
-                    '${forecast.maxTemp.toStringAsFixed(0)}',
-                    style: TextStyle(fontSize: 50, color: Colors.white),
+                    "Nhiệt độ CAO NHẤT",
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
-                    '°',
-                    style: TextStyle(fontSize: 28, color: Colors.white),
-                  ),
-                  const SizedBox(width: 9),
-                  Text(
-                    '${forecast.minTemp.toStringAsFixed(0)}°',
-                    style: TextStyle(fontSize: 26, color: Colors.white70),
-                  ),
-                  const SizedBox(width: 13),
-                  Icon(
-                    Icons.cloud,
-                    color: Colors.white,
-                    size: 33,
-                  ), // Nên chọn icon đúng kiểu thời tiết
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Text('Độ C (°C)', style: TextStyle(color: Colors.white54)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Biểu đồ nhiệt độ theo giờ
-              HourlyWeatherChart(hourlyData: hourlyForecast),
-              SizedBox(height: 10),
-              // Toggle Thực tế / Cảm nhận (demo, chưa active)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white12,
-                      foregroundColor: Colors.white,
+                    "${maxTemp.round()}°C",
+                    style: TextStyle(
+                      color: Colors.amber,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
-                    onPressed: () {},
-                    child: Text('Thực tế'),
-                  ),
-                  SizedBox(width: 7),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white10,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {},
-                    child: Text('Cảm nhận'),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Center(
-                child: Text(
-                  'Nhiệt độ thực tế.',
-                  style: TextStyle(color: Colors.white38),
-                ),
-              ),
-              SizedBox(height: 16),
-              // Khả năng mưa
-              Text(
-                'Khả năng có mưa',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'Khả năng có mưa vào ${getViDayName(forecast.dateTime)}: ${forecast.rainChance}%',
-                style: TextStyle(color: Colors.white70, fontSize: 15),
-              ),
-              SizedBox(height: 16),
-              Container(
-                height: 80,
-                margin: EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Container(
-                        height: 8,
-                        margin: EdgeInsets.symmetric(horizontal: 24),
-                        decoration: BoxDecoration(
-                          color: Colors.blueAccent,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        width: forecast.rainChance * 2.5,
-                      ),
-                    ),
-                    Positioned(
-                      right: 12,
-                      top: 18,
-                      child: Text(
-                        '${forecast.rainChance}%',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 10),
-              // Thông tin bổ sung
-              Row(
+              Column(
                 children: [
                   Text(
-                    'Gió: ${forecast.windSpeed} km/h',
-                    style: TextStyle(color: Colors.white, fontSize: 15),
+                    "Nhiệt độ THẤP NHẤT",
+                    style: TextStyle(
+                      color: Colors.cyanAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  SizedBox(width: 24),
                   Text(
-                    'Độ ẩm: ${forecast.humidity}%',
-                    style: TextStyle(color: Colors.white, fontSize: 15),
+                    "${minTemp.round()}°C",
+                    style: TextStyle(
+                      color: Colors.cyanAccent,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
-              SizedBox(height: 10),
-              Text(
-                '${forecast.description}',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-              SizedBox(height: 9),
-              // Đường viền mờ cuối page cho đẹp
-              Divider(color: Colors.white24, thickness: 1),
             ],
           ),
-        ),
+          SizedBox(height: 12),
+          HourlyTemperatureChart(hourlyList: hourlyList),
+          SizedBox(height: 16),
+          Text(
+            "Khả năng có mưa",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 17,
+            ),
+          ),
+          HourlyRainChanceChart(hourlyList: hourlyList),
+          SizedBox(height: 8),
+          Text(
+            "Khả năng có mưa vào hôm nay: ${maxRainChance}%",
+            style: TextStyle(color: Colors.blue[100], fontSize: 15),
+          ),
+          Text(
+            "Khả năng có mưa hàng ngày có xu hướng cao hơn khả năng cho mỗi giờ.",
+            style: TextStyle(color: Colors.grey[300], fontSize: 13),
+          ),
+          if (hourlyList.any((e) => e.rainVolume != null)) ...[
+            SizedBox(height: 10),
+            Text(
+              "Tổng lượng mưa hôm nay: ${totalRainVolume.toStringAsFixed(1)} mm",
+              style: TextStyle(color: Colors.lightBlueAccent, fontSize: 16),
+            ),
+          ],
+          SizedBox(height: 18),
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  "Độ ẩm trung bình: ${avgHumidity.round()}%",
+                  style: TextStyle(color: Colors.lightBlueAccent, fontSize: 15),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
